@@ -47,6 +47,19 @@ namespace ZZZ
             string.Equals(Environment.GetEnvironmentVariable("ClickOnce_IsNetworkDeployed"), "true", StringComparison.OrdinalIgnoreCase)
             || AppContext.BaseDirectory.Contains(@"\Apps\2.0\", StringComparison.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// 是否由「APP 啟動器」下載執行(%LocalAppData%\AppLauncher\apps\ledger\{版本}\...)。
+        /// 啟動器裝好一個版本會在版本資料夾放 .launcher.json;這種情況由啟動器負責更新,程式本身只提醒有新版。
+        /// </summary>
+        public static bool IsLauncherManaged { get; } = FindLauncherMarker(AppContext.BaseDirectory);
+
+        static bool FindLauncherMarker(string dir)
+        {
+            for (var d = new DirectoryInfo(dir); d != null; d = d.Parent)
+                if (File.Exists(Path.Combine(d.FullName, ".launcher.json"))) return true;
+            return false;
+        }
+
         static int[] Parse(string v) =>
             v.TrimStart('v', 'V').Split('.').Select(x => int.TryParse(x, out var n) ? n : 0).ToArray();
 

@@ -1544,6 +1544,14 @@ namespace ZZZ
             if (notes == "") notes = "(無說明)";
             var head = $"有新版本 {info.Version} 可用(目前 v{Updater.CurrentVersion})。\n\n{notes}\n\n";
 
+            // 從 APP 啟動器開的:新版由啟動器下載,這裡只提醒(啟動時的自動檢查不打擾,啟動器自己會標示可更新)
+            if (!Updater.IsInstalled && Updater.IsLauncherManaged)
+            {
+                if (!silent)
+                    DialogWindow.Info(this, "發現新版本", head + $"請到「APP 啟動器」按「更新到 v{info.Version.TrimStart('v', 'V')}」,更新後從啟動器開啟新版。");
+                return;
+            }
+
             // 安裝版且 Release 附有安裝包:直接下載並升級;免安裝版或開發版:前往下載頁面
             if (!Updater.IsInstalled || info.PackageUrl == null)
             {
