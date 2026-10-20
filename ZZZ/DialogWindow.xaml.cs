@@ -163,13 +163,16 @@ namespace ZZZ
         }
 
         /// <param name="validate">回傳錯誤訊息則留在對話框;回傳 null 表示通過。</param>
+        /// <param name="preview">每次輸入改變時依目前的值算出一段說明,顯示在欄位下方(例如分期每期要繳多少)</param>
         public static string[]? Prompt(Window? owner, string title, string message, Field[] fields,
-                                       Func<string[], string?>? validate = null, string okText = "確定", bool danger = false)
+                                       Func<string[], string?>? validate = null, string okText = "確定", bool danger = false,
+                                       Func<string[], string>? preview = null)
         {
             var d = Build(owner, danger ? Kind.Danger : Kind.Input, title, message);
             d.OkBtn.Content = okText;
             if (danger) d.OkBtn.Style = (Style)d.FindResource("DangerSolidButton");
             d.validate = validate;
+            Action? changed = null;
             foreach (var f in fields)
             {
                 d.Fields.Children.Add(new TextBlock
@@ -185,13 +188,30 @@ namespace ZZZ
                     };
                     d.values.Add(() => cb.SelectedItem as string ?? "");
                     d.firstInput ??= cb;
+                    cb.SelectionChanged += (_, _) => changed?.Invoke();
                     d.Fields.Children.Add(cb);
                     continue;
                 }
                 var tb = new TextBox { Text = f.Initial, Tag = f.Hint };
                 d.values.Add(() => tb.Text.Trim());
                 d.firstInput ??= tb;
+                tb.TextChanged += (_, _) => changed?.Invoke();
                 d.Fields.Children.Add(f.IsDate ? d.DateBox(tb) : tb);
+            }
+            if (preview != null)
+            {
+                var text = new TextBlock { FontSize = 13, LineHeight = 20, TextWrapping = TextWrapping.Wrap };
+                text.SetResourceReference(TextBlock.ForegroundProperty, "InkBrush");
+                System.Windows.Automation.AutomationProperties.SetAutomationId(text, "PreviewText");
+                var box = new Border { CornerRadius = new CornerRadius(8), Padding = new Thickness(12, 9, 12, 9), Margin = new Thickness(0, 16, 0, 0), Child = text };
+                box.SetResourceReference(Border.BackgroundProperty, "GhostBrush");
+                d.Fields.Children.Add(box);
+                changed = () =>
+                {
+                    text.Text = preview(d.values.Select(v => v()).ToArray());
+                    box.Visibility = text.Text == "" ? Visibility.Collapsed : Visibility.Visible;
+                };
+                changed();
             }
             d.Loaded += (_, _) =>
             {

@@ -464,19 +464,32 @@
                     <Border x:Name="HeroCard" Background="{DynamicResource HeroBrush}" CornerRadius="12" Padding="22,16">
                         <StackPanel>
                             <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="HeroLabel" Text="目前總餘額" Foreground="#AEB6C3" FontSize="13"
                                            VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,8,0"/>
-                                <TextBlock x:Name="HeroIcon" Text="&#xE8C7;" Style="{StaticResource Icon}" Foreground="#AEB6C3"
+                                <TextBlock x:Name="HeroIcon" Grid.Column="1" Text="&#xE8C7;" Style="{StaticResource Icon}" Foreground="#AEB6C3"
                                            FontSize="16" HorizontalAlignment="Right"/>
                                 <!-- 選到信用卡時顯示 -->
-                                <Button x:Name="PayCardBtn" Style="{StaticResource HeroButton}" HorizontalAlignment="Right"
-                                        Height="28" Padding="10,0" Margin="0,-6,-8,-6" Visibility="Collapsed"
-                                        Click="PayCard_Click" ToolTip="從連結的錢包繳這張卡的帳單">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE8C7;" Style="{StaticResource Icon}" FontSize="11"/>
-                                        <TextBlock Text="繳卡費" Margin="6,0,0,0" FontSize="12"/>
-                                    </StackPanel>
-                                </Button>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,-6,-8,-6">
+                                    <Button x:Name="InstallmentBtn" Style="{StaticResource HeroButton}" Height="28" Padding="10,0"
+                                            Margin="0,0,6,0" Visibility="Collapsed" Click="Installment_Click"
+                                            ToolTip="刷卡分期:每一期自動記一筆支出,可以設定年利率">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE787;" Style="{StaticResource Icon}" FontSize="11"/>
+                                            <TextBlock Text="分期" Margin="6,0,0,0" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button x:Name="PayCardBtn" Style="{StaticResource HeroButton}" Height="28" Padding="10,0"
+                                            Visibility="Collapsed" Click="PayCard_Click" ToolTip="從連結的錢包繳這張卡的帳單">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8C7;" Style="{StaticResource Icon}" FontSize="11"/>
+                                            <TextBlock Text="繳卡費" Margin="6,0,0,0" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                             <TextBlock x:Name="BalanceText" Text="0" Foreground="White" FontSize="32" FontWeight="Bold"
                                        Margin="0,6,0,0" TextTrimming="CharacterEllipsis"/>
@@ -669,7 +682,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTextColumn Header="備註" Binding="{Binding Note}" Width="*" ElementStyle="{StaticResource CellMuted}"/>
+                                <DataGridTextColumn Header="備註" Binding="{Binding NoteText}" Width="*" ElementStyle="{StaticResource CellMuted}"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <StackPanel x:Name="RecEmpty" HorizontalAlignment="Center" VerticalAlignment="Center"

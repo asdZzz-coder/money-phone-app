@@ -105,7 +105,7 @@ namespace ZZZ
             var sb = new StringBuilder(string.Join(",", CsvHeader) + "\r\n");
             foreach (var r in rows)
                 sb.Append(string.Join(",", Csv(r.Date), Csv(r.Wallet), Csv(r.Type), Csv(r.Category),
-                    r.Amount.ToString(CultureInfo.InvariantCulture), Csv(r.Note))).Append("\r\n");
+                    r.Amount.ToString(CultureInfo.InvariantCulture), Csv(r.NoteText))).Append("\r\n");
             File.WriteAllText(path, sb.ToString(), new UTF8Encoding(true)); // 含 BOM,Excel 開啟才不會亂碼
         }
 

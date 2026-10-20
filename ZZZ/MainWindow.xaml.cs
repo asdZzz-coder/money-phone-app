@@ -400,7 +400,8 @@ namespace ZZZ
                 converting ? $"「{w.Name}」目前的餘額 {Money(w.Balance)} 會當作這張卡的" +
                              (w.Balance > 0 ? "溢繳款(多繳的錢,之後刷卡會先扣)。" : "欠款(負數代表欠款)。")
                            : "繳卡費一律從「繳卡費的錢包」扣款。",
-                fields.ToArray(), vals => ToCard(vals) ? validate(vals) : vals[0] == "" ? "請輸入名稱" : null, "儲存");
+                fields.ToArray(), vals => ToCard(vals) ? validate(vals) : vals[0] == "" ? "請輸入名稱"
+                    : db.Installments(w.Id).Count > 0 ? "這張卡還有分期付款,不能改成一般錢包" : null, "儲存");
             if (v == null) return;
             bool ok = ToCard(v)
                 ? db.UpdateWallet(w.Id, v[0], Database.CreditCard, AmountOrZero(v[4]), Day(v[1]), Day(v[2]), payers.First(p => p.Name == v[3]).Id)
@@ -429,11 +430,13 @@ namespace ZZZ
             var msg = (!owing ? $"目前沒有欠款{(card.Credit > 0.0001 ? $"(已溢繳 {Money(card.Credit)})" : "")},現在繳的錢會成為溢繳款,之後刷卡會先扣。"
                        : bill.Settled ? $"本期帳單已繳清,目前未出帳 {Money(bill.Unbilled)}。"
                        : $"本期帳單({bill.Closing:M/d} 結帳)還要繳 {Money(bill.Remaining)},繳款日 {bill.Due:M/d}。")
+                      + (bill.Future > 0.0001 ? $"\n分期還沒到期的 {Money(bill.Future)} 會在每期出帳後再繳。" : "")
                       + (owing ? "\n金額可以超過欠款,多繳的部分會成為溢繳款。" : "")
                       + $"\n按「已繳費」後從「{payer.Name}」扣款,不會重複算成支出。";
             var v = DialogWindow.Prompt(this, $"繳卡費:{card.Name}", msg,
             [
-                new Field("已繳金額", !owing ? "" : (bill.Settled ? card.Owed : bill.Remaining).ToString("0.##")),
+                new Field("已繳金額", !owing ? "" : bill.Settled ? (bill.Unbilled > 0.0001 ? bill.Unbilled.ToString("0.##") : "")
+                                                 : bill.Remaining.ToString("0.##")),
                 new Field("繳費日期", DateTime.Today.ToString("yyyy-MM-dd"), "點日曆選擇,或直接輸入 YYYY-MM-DD", IsDate: true),
                 new Field("備註(可空白)", ""),
             ], vals =>
@@ -445,6 +448,81 @@ namespace ZZZ
             if (v == null) return;
             DialogWindow.TryParseAmount(v[0], out var amt);
             db.AddTransfer(NormalizeDate(v[1]), payer.Id, card.Id, amt, v[2]);
+            RefreshSidebar();
+            RefreshRecords();
+        }
+
+        // ================= 信用卡分期 =================
+        /// <summary>大卡片的「分期」:沒有分期就直接新增;有的話先選要新增還是管理哪一筆。</summary>
+        void Installment_Click(object sender, RoutedEventArgs e)
+        {
+            if (db.Wallets().FirstOrDefault(w => w.Id == selWallet && w.IsCard) is not Wallet card) return;
+            var plans = db.Installments(card.Id);
+            if (plans.Count == 0) { InstallmentForm(card, null); return; }
+            var choice = DialogWindow.Choose(this, $"分期:{card.Name}", "新增一筆分期,或選一筆修改、刪除。",
+                [("\uE710", "新增分期", "例如刷卡買手機分 12 期,每一期自動記一筆支出"),
+                 .. plans.Select(p => ("\uE8C7", p.Note == "" ? p.Category : p.Note, p.Summary))]);
+            if (choice is int i) { if (i == 0) InstallmentForm(card, null); else ManageInstallment(plans[i - 1]); }
+        }
+
+        void ManageInstallment(InstallmentRow p)
+        {
+            if (db.Wallets().FirstOrDefault(w => w.Id == p.WalletId) is not Wallet card) return;
+            var name = p.Note == "" ? p.Category : p.Note;
+            var choice = DialogWindow.Choose(this, $"分期:{name}", p.Summary + (p.Rate > 0 ? $"\n利息合計 {Money(p.Interest)}" : ""),
+            [
+                ("\uE70F", "修改分期", "改金額、期數、利率或日期,每一期會依新內容重新產生"),
+                ("\uE74D", "刪除分期", $"刪掉這筆分期和它全部 {p.Periods} 期的支出記錄"),
+            ]);
+            if (choice == 0) InstallmentForm(card, p);
+            else if (choice == 1 &&
+                     DialogWindow.Confirm(this, "刪除分期", $"刪除「{name}」的分期,連同全部 {p.Periods} 期的支出記錄?\n此動作無法復原。",
+                                          "刪除", danger: true))
+            {
+                db.DeleteInstallments([p.Id]);
+                RefreshSidebar();
+                RefreshRecords();
+            }
+        }
+
+        /// <summary>新增或修改分期。輸入時下方即時試算每期要繳多少、利息合計。</summary>
+        /// <param name="p">要修改的分期;null 為新增</param>
+        void InstallmentForm(Wallet card, InstallmentRow? p)
+        {
+            var cats = db.Categories(Database.Expense);
+            if (p != null && !cats.Contains(p.Category)) cats.Insert(0, p.Category); // 分類已被刪掉也保留原值
+            if (cats.Count == 0) { DialogWindow.Info(this, "提示", "請先在「管理分類」建立支出分類。"); return; }
+            // 欄位:品項、分類、總金額、期數、年利率、第 1 期日期
+            string? Parse(string[] vals, out double amount, out int periods, out double rate)
+            {
+                periods = 0; rate = 0;
+                if (!DialogWindow.TryParseAmount(vals[2], out amount) || amount <= 0) return "總金額需大於 0";
+                if (!int.TryParse(vals[3], out periods) || periods < 2 || periods > 120) return "期數請輸入 2 到 120";
+                if (!DialogWindow.TryParseAmount(vals[4].TrimEnd('%'), out rate) || rate < 0 || rate > 100) return "年利率請輸入 0 到 100(%)";
+                if (amount < periods) return "總金額太少,每期至少要 1 元";
+                return null;
+            }
+            var v = DialogWindow.Prompt(this, p == null ? $"新增分期:{card.Name}" : "修改分期",
+                "每一期會自動在這張卡記一筆支出,出現在當期的帳單。\n利息用本息平均攤還:每期繳一樣多,利息按剩下的本金算,逐期遞減。",
+            [
+                new Field("品項", p?.Note ?? "", "例如:手機"),
+                new Field("分類", p?.Category ?? (cats.Contains("購物") ? "購物" : cats[0]), Options: cats.ToArray()),
+                new Field("總金額", p?.Amount.ToString("0.##") ?? ""),
+                new Field("分幾期", p?.Periods.ToString() ?? "12"),
+                new Field("年利率(%),0 為無息分期", p?.Rate.ToString("0.###") ?? "0"),
+                new Field("第 1 期日期(刷卡日)", p?.Date ?? DateTime.Today.ToString("yyyy-MM-dd"), "點日曆選擇,或直接輸入 YYYY-MM-DD", IsDate: true),
+            ], vals =>
+            {
+                if (vals[0] == "") return "請輸入品項";
+                if (Parse(vals, out _, out _, out _) is string err) return err;
+                if (!DateTime.TryParse(vals[5], out _)) return "日期格式為 YYYY-MM-DD";
+                return null;
+            }, p == null ? "新增" : "儲存",
+            preview: vals => Parse(vals, out var a, out var n, out var r) == null ? Installment.Summary(a, n, r) : "");
+            if (v == null) return;
+            Parse(v, out var amount, out var periods, out var rate);
+            if (p == null) db.AddInstallment(card.Id, NormalizeDate(v[5]), v[1], amount, periods, rate, v[0]);
+            else db.UpdateInstallment(p.Id, NormalizeDate(v[5]), v[1], amount, periods, rate, v[0]);
             RefreshSidebar();
             RefreshRecords();
         }
@@ -506,9 +584,11 @@ namespace ZZZ
         {
             if (WalletList.SelectedItem is not WalletItem { Id: long id } item) return;
             if (db.WalletCount() <= 1) { DialogWindow.Info(this, "提示", "至少要保留一個錢包"); return; }
-            int n = db.WalletRecordCount(id), t = db.WalletTransferCount(id), debts = db.WalletDebtCount(id);
+            int n = db.WalletRecordCount(id), t = db.WalletTransferCount(id), debts = db.WalletDebtCount(id),
+                plans = db.Installments(id).Count;
             if (!DialogWindow.Confirm(this, "刪除錢包",
                     $"刪除「{item.Name}」,並一併刪除其中 {n} 筆記錄?\n" +
+                    (plans > 0 ? $"這張卡的 {plans} 筆分期付款(含還沒到期的各期)也會一起刪除。\n" : "") +
                     (item.Goal != "" ? $"存錢目標「{item.Goal}」會改成不指定錢包(已存金額不變)。\n" : "") +
                     (t > 0 ? $"和其他錢包之間的 {t} 筆轉帳(轉移資金、繳卡費),會改記成對方錢包的收支(對方餘額不變)。\n" : "") +
                     (debts > 0 ? $"經過這個錢包的 {debts} 筆借款、還款會改成不經過錢包(欠款金額與已還金額不變)。\n" : "") +
@@ -571,7 +651,7 @@ namespace ZZZ
             BalanceSub.Text = bill?.Detail ?? (selWallet == null ? $"全部錢包 · 流動資金 {Money(Liquid(wallets))}"
                                               : (WalletList.SelectedItem as WalletItem)?.Name ?? "");
             HeroCard.ToolTip = bill?.Tip;
-            PayCardBtn.Visibility = card != null ? Visibility.Visible : Visibility.Collapsed;
+            PayCardBtn.Visibility = InstallmentBtn.Visibility = card != null ? Visibility.Visible : Visibility.Collapsed;
             HeroIcon.Visibility = card != null ? Visibility.Collapsed : Visibility.Visible;
             IncomeText.Text = Money(inc);
             ExpenseText.Text = Money(exp);
@@ -682,6 +762,11 @@ namespace ZZZ
             }
             if (r is TransferRow t) { EditTransfer(t); return; }
             if (r is DebtMoveRow m) { EditDebtMove(m); return; }
+            if (r.PlanId is long planId) // 分期的一期:改整筆分期
+            {
+                if (db.Installments().FirstOrDefault(p => p.Id == planId) is InstallmentRow plan) ManageInstallment(plan);
+                return;
+            }
             var wallets = db.Wallets();
             var kinds = new List<string>();
             foreach (var type in new[] { Database.Expense, Database.Income })
@@ -728,9 +813,15 @@ namespace ZZZ
                 DialogWindow.Info(this, "提示", "「借出」「借入」那一筆就是欠款本身,請到「欠款紀錄」編輯或刪除。");
                 return;
             }
+            // 分期的每一期是自動產生的,刪掉其中一期就刪掉整筆分期
+            var plans = sel.Where(r => r.PlanId != null).GroupBy(r => r.PlanId!.Value).ToList();
             if (!DialogWindow.Confirm(this, "刪除記錄", $"確定刪除 {sel.Count} 筆記錄?" +
-                    (moves.Count > 0 ? "\n刪掉的還款會從欠款的已還金額扣回來。" : ""), "刪除", danger: true)) return;
-            db.DeleteRecords(sel.Where(r => r.GetType() == typeof(RecordRow)).Select(r => r.Id), sel.OfType<TransferRow>().Select(t => t.Id));
+                    (moves.Count > 0 ? "\n刪掉的還款會從欠款的已還金額扣回來。" : "") +
+                    (plans.Count > 0 ? $"\n其中有分期付款,會連同那 {plans.Count} 筆分期的每一期(共 {plans.Sum(g => g.First().Periods)} 期)一起刪除。" : ""),
+                    "刪除", danger: true)) return;
+            db.DeleteRecords(sel.Where(r => r.GetType() == typeof(RecordRow) && r.PlanId == null).Select(r => r.Id),
+                             sel.OfType<TransferRow>().Select(t => t.Id));
+            db.DeleteInstallments(plans.Select(g => g.Key));
             db.DeleteDebtPayments(moves.Select(m => m.Id));
             if (moves.Count > 0) RefreshDebts();
             RefreshSidebar();

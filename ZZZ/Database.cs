@@ -26,11 +26,12 @@ namespace ZZZ
     /// <param name="Remaining">本期還要繳的金額</param>
     /// <param name="Owed">目前總欠款</param>
     /// <param name="Credit">多繳的錢(溢繳款)</param>
+    /// <param name="Future">分期還沒到期的各期(日期在今天之後):算在總欠款裡,但不算未出帳</param>
     public record CardBill(DateTime Closing, DateTime Due, double Statement, double Remaining, double Owed, double Limit,
-                           double Credit = 0)
+                           double Credit = 0, double Future = 0)
     {
         public double Paid => Math.Max(Statement - Remaining, 0);
-        public double Unbilled => Math.Max(Owed - Remaining, 0);
+        public double Unbilled => Math.Max(Owed - Remaining - Future, 0);
         public int DaysLeft => (int)(Due - DateTime.Today).TotalDays;
         public bool Settled => Remaining <= 0.0001;
         public bool Late => !Settled && DaysLeft < 0;
@@ -80,6 +81,7 @@ namespace ZZZ
                     $"已繳 {Paid:N0},還要繳 {Remaining:N0},繳款日 {Due:M/d}",
                     $"未出帳 {Unbilled:N0},目前總欠款 {Owed:N0}",
                 };
+                if (Future > 0.0001) lines.Add($"分期還沒到期 {Future:N0}(算在總欠款裡,每期到了才出帳)");
                 if (Credit > 0.0001) lines.Add($"溢繳 {Credit:N0}(多繳的錢,之後刷卡會先扣)");
                 if (Limit > 0) lines.Add($"信用額度 {Limit:N0},可用 {Limit - Owed + Credit:N0}");
                 return string.Join("\n", lines);
@@ -87,10 +89,73 @@ namespace ZZZ
         }
     }
 
+    /// <summary>信用卡分期付款。每一期是一筆自動產生的支出記錄(records.installment_id),記在信用卡上。</summary>
+    /// <param name="Rate">年利率(%),0 為無息分期</param>
+    /// <param name="Billed">已經到期(日期在今天或之前)的期數</param>
+    /// <param name="Total">各期合計(本金 + 利息)</param>
+    /// <param name="Left">還沒到期的各期合計</param>
+    public record InstallmentRow(long Id, long WalletId, string Date, string Category, double Amount, int Periods, double Rate,
+                                 string Note, int Billed, double Total, double Left)
+    {
+        public double Interest => Total - Amount;
+        public string RateText => Rate == 0 ? "無息" : $"年利率 {Rate:0.##}%";
+        public string Summary => $"{Amount:N0} · {Periods} 期 · {RateText} · " +
+                                 (Billed >= Periods ? "已全部到期" : $"已到第 {Billed}/{Periods} 期 · 還沒到期 {Left:N0}");
+    }
+
+    /// <summary>分期的算法:本息平均攤還,每期繳一樣多,利息按剩下的本金算,所以逐期遞減。</summary>
+    public static class Installment
+    {
+        /// <returns>每一期的本金與利息。每期金額取整數元(無條件捨去),尾數併入最後一期。</returns>
+        public static List<(double Principal, double Interest)> Schedule(double amount, int periods, double rate)
+        {
+            double r = rate / 100 / 12;
+            double pay = Math.Floor(r == 0 ? amount / periods : amount * r / (1 - Math.Pow(1 + r, -periods)));
+            var list = new List<(double, double)>();
+            double rest = amount;
+            for (int k = 0; k < periods; k++)
+            {
+                double interest = Math.Round(rest * r);
+                double principal = k == periods - 1 ? rest : Math.Clamp(pay - interest, 0, rest);
+                list.Add((principal, interest));
+                rest -= principal;
+            }
+            return list;
+        }
+
+        /// <summary>第 k 期(從 0 起算)的日期:第 1 期那天之後每個月同一天,月份天數不夠時為月底。</summary>
+        public static string PeriodDate(string first, int k)
+        {
+            var d = DateTime.Parse(first);
+            var m = d.AddMonths(k);
+            return CardBill.DayIn(m.Year, m.Month, d.Day).ToString("yyyy-MM-dd");
+        }
+
+        /// <summary>新增/修改分期時顯示的試算結果。</summary>
+        public static string Summary(double amount, int periods, double rate)
+        {
+            var s = Schedule(amount, periods, rate);
+            double interest = s.Sum(x => x.Interest), each = s[0].Principal + s[0].Interest, last = s[^1].Principal + s[^1].Interest;
+            var lines = new List<string>
+            {
+                Math.Abs(each - last) < 0.005 ? $"每期繳 {each:N0}" : $"每期繳 {each:N0},最後一期 {last:N0}(含尾數)",
+                rate == 0 ? $"無息分期,總共繳 {amount:N0}" : $"利息合計 {interest:N0},總共繳 {amount + interest:N0}",
+            };
+            if (rate > 0 && periods > 1)
+                lines.Add($"第 1 期利息 {s[0].Interest:N0},最後一期 {s[^1].Interest:N0}(逐期遞減)");
+            return string.Join("\n", lines);
+        }
+    }
+
+    /// <param name="PlanId">信用卡分期自動產生的那一期(installments.id);一般記錄為 null</param>
+    /// <param name="Period">第幾期</param>
+    /// <param name="Periods">共幾期</param>
     public record RecordRow(long Id, string Date, string Wallet, string Type,
-                            string Category, double Amount, string Note)
+                            string Category, double Amount, string Note, long? PlanId = null, int Period = 0, int Periods = 0)
     {
         public bool IsIncome => Type == Database.Income;
+        /// <summary>清單的備註欄;分期的每一期前面加上「分期 3/12」。</summary>
+        public string NoteText => PlanId == null ? Note : $"分期 {Period}/{Periods}" + (Note != "" ? $" · {Note}" : "");
         public virtual bool IsTransfer => false;
         public virtual string AmountText => (IsIncome ? "+" : "−") + Amount.ToString("N0");
     }
@@ -320,6 +385,14 @@ namespace ZZZ
             // 經過錢包的還款(不經過錢包的還款只累加 debts.paid)
             Exec("CREATE TABLE IF NOT EXISTS debt_payments(id INTEGER PRIMARY KEY AUTOINCREMENT, debt_id INTEGER," +
                  "date TEXT, wallet_id INTEGER, amount REAL, note TEXT)");
+            // 信用卡分期:每一期是一筆 records(installment_id 指向分期,period 為第幾期)
+            Exec("CREATE TABLE IF NOT EXISTS installments(id INTEGER PRIMARY KEY AUTOINCREMENT, wallet_id INTEGER, date TEXT," +
+                 "category TEXT, amount REAL, periods INTEGER, rate REAL, note TEXT)");
+            if (!Columns("records").Contains("installment_id"))
+            {
+                Exec("ALTER TABLE records ADD COLUMN installment_id INTEGER");
+                Exec("ALTER TABLE records ADD COLUMN period INTEGER");
+            }
             if (Convert.ToInt64(Scalar("PRAGMA user_version")) < 1) ConvertLinkedGoals();
             EnsureDefaults();
         }
@@ -393,9 +466,11 @@ namespace ZZZ
             var c = closing.ToString("yyyy-MM-dd");
             var balance = Convert.ToDouble(Scalar($"SELECT {BalanceSql(" AND date <= @p1")} FROM wallets w WHERE w.id = @p0", card.Id, c));
             var paid = Convert.ToDouble(Scalar("SELECT COALESCE(SUM(amount), 0) FROM transfers WHERE to_wallet = @p0 AND date > @p1", card.Id, c));
+            var future = Convert.ToDouble(Scalar("SELECT COALESCE(SUM(amount), 0) FROM records WHERE wallet_id = @p0 " +
+                                                 "AND installment_id IS NOT NULL AND date > @p1", card.Id, DateTime.Today.ToString("yyyy-MM-dd")));
             double statement = Math.Max(-balance, 0);
             return new CardBill(closing, CardBill.DueAfter(closing, card.DueDay), statement,
-                                Math.Clamp(statement - paid, 0, card.Owed), card.Owed, card.Limit, card.Credit);
+                                Math.Clamp(statement - paid, 0, card.Owed), card.Owed, card.Limit, card.Credit, future);
         }
 
         /// <returns>新錢包 id;名稱重複時回傳 null</returns>
@@ -482,6 +557,7 @@ namespace ZZZ
             }
             Exec("DELETE FROM transfers WHERE from_wallet=@p0 OR to_wallet=@p0", id);
             Exec("DELETE FROM records WHERE wallet_id=@p0", id);
+            Exec("DELETE FROM installments WHERE wallet_id=@p0", id); // 各期的記錄已在上一行刪掉
             Exec("UPDATE goals SET wallet_id=NULL WHERE wallet_id=@p0", id); // 連結的目標改回手動存入
             // 欠款本身(金額、已還)不變,只是不再經過這個錢包
             Exec("UPDATE debts SET wallet_id=NULL WHERE wallet_id=@p0", id);
@@ -521,11 +597,12 @@ namespace ZZZ
             var args = new List<object?>();
             if (month != "") { where.Add($"r.date LIKE @p{args.Count}"); args.Add(month + "%"); }
             if (walletId != null) { where.Add($"r.wallet_id=@p{args.Count}"); args.Add(walletId); }
-            var sql = "SELECT r.id, r.date, w.name, r.type, r.category, r.amount, r.note " +
-                      "FROM records r LEFT JOIN wallets w ON w.id = r.wallet_id";
+            var sql = "SELECT r.id, r.date, w.name, r.type, r.category, r.amount, r.note, r.installment_id, r.period, i.periods " +
+                      "FROM records r LEFT JOIN wallets w ON w.id = r.wallet_id LEFT JOIN installments i ON i.id = r.installment_id";
             if (where.Count > 0) sql += " WHERE " + string.Join(" AND ", where);
             return Query(sql + " ORDER BY r.date DESC, r.id DESC",
-                r => new RecordRow(r.GetInt64(0), Str(r, 1), Str(r, 2), Str(r, 3), Str(r, 4), Num(r, 5), Str(r, 6)),
+                r => new RecordRow(r.GetInt64(0), Str(r, 1), Str(r, 2), Str(r, 3), Str(r, 4), Num(r, 5), Str(r, 6),
+                                   r.IsDBNull(7) ? null : r.GetInt64(7), (int)Num(r, 8), (int)Num(r, 9)),
                 args.ToArray());
         }
 
@@ -550,6 +627,62 @@ namespace ZZZ
         {
             foreach (var id in ids) Exec("DELETE FROM records WHERE id=@p0", id);
             foreach (var id in transferIds ?? []) Exec("DELETE FROM transfers WHERE id=@p0", id);
+        });
+
+        // ---------- 信用卡分期 ----------
+        /// <param name="walletId">只列出這張卡的;null 為全部</param>
+        public List<InstallmentRow> Installments(long? walletId = null)
+        {
+            var today = DateTime.Today.ToString("yyyy-MM-dd");
+            const string Periods = "FROM records r WHERE r.installment_id = i.id";
+            return Query(
+                "SELECT i.id, i.wallet_id, i.date, i.category, i.amount, i.periods, i.rate, i.note, " +
+                $"(SELECT COUNT(*) {Periods} AND r.date <= @p0), (SELECT COALESCE(SUM(r.amount), 0) {Periods}), " +
+                $"(SELECT COALESCE(SUM(r.amount), 0) {Periods} AND r.date > @p0) FROM installments i" +
+                (walletId != null ? " WHERE i.wallet_id = @p1" : "") + " ORDER BY i.date DESC, i.id DESC",
+                r => new InstallmentRow(r.GetInt64(0), r.GetInt64(1), Str(r, 2), Str(r, 3), Num(r, 4), (int)Num(r, 5), Num(r, 6),
+                                        Str(r, 7), r.GetInt32(8), Num(r, 9), Num(r, 10)),
+                walletId != null ? new object?[] { today, walletId } : [today]);
+        }
+
+        /// <summary>新增分期,並在信用卡上產生每一期的支出記錄。</summary>
+        /// <param name="date">第 1 期的日期(通常是刷卡那天),之後每個月同一天一期</param>
+        public void AddInstallment(long walletId, string date, string category, double amount, int periods, double rate, string note) =>
+            InTransaction(() =>
+            {
+                Exec("INSERT INTO installments(wallet_id,date,category,amount,periods,rate,note) VALUES(@p0,@p1,@p2,@p3,@p4,@p5,@p6)",
+                     walletId, date, category, amount, periods, rate, note);
+                AddPeriods((long)Scalar("SELECT last_insert_rowid()")!, walletId, date, category, amount, periods, rate, note);
+            });
+
+        /// <summary>修改分期;各期的記錄依新內容重新產生。</summary>
+        public void UpdateInstallment(long id, string date, string category, double amount, int periods, double rate, string note) =>
+            InTransaction(() =>
+            {
+                var walletId = Convert.ToInt64(Scalar("SELECT wallet_id FROM installments WHERE id=@p0", id));
+                Exec("UPDATE installments SET date=@p0, category=@p1, amount=@p2, periods=@p3, rate=@p4, note=@p5 WHERE id=@p6",
+                     date, category, amount, periods, rate, note, id);
+                Exec("DELETE FROM records WHERE installment_id=@p0", id);
+                AddPeriods(id, walletId, date, category, amount, periods, rate, note);
+            });
+
+        void AddPeriods(long id, long walletId, string date, string category, double amount, int periods, double rate, string note)
+        {
+            var s = Installment.Schedule(amount, periods, rate);
+            for (int k = 0; k < s.Count; k++)
+                Exec("INSERT INTO records(date,type,category,amount,note,wallet_id,installment_id,period) " +
+                     "VALUES(@p0,@p1,@p2,@p3,@p4,@p5,@p6,@p7)",
+                     Installment.PeriodDate(date, k), Expense, category, s[k].Principal + s[k].Interest, note, walletId, id, k + 1);
+        }
+
+        /// <summary>刪除分期與它的每一期記錄。</summary>
+        public void DeleteInstallments(IEnumerable<long> ids) => InTransaction(() =>
+        {
+            foreach (var id in ids)
+            {
+                Exec("DELETE FROM records WHERE installment_id=@p0", id);
+                Exec("DELETE FROM installments WHERE id=@p0", id);
+            }
         });
 
         // ---------- 欠款 ----------
@@ -684,7 +817,7 @@ namespace ZZZ
         public void DeleteDeposit(long id) => Exec("DELETE FROM goal_deposits WHERE id=@p0", id);
 
         // ---------- 匯出 / 匯入 ----------
-        public static readonly string[] Tables = ["wallets", "categories", "records", "transfers", "debts", "debt_payments", "goals", "goal_deposits"];
+        public static readonly string[] Tables = ["wallets", "categories", "records", "transfers", "debts", "debt_payments", "goals", "goal_deposits", "installments"];
 
         /// <summary>讀出整張表(含 rowid 順序),供完整備份使用。</summary>
         public List<Dictionary<string, object?>> Dump(string table)
