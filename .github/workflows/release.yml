@@ -13,6 +13,8 @@ permissions:
 
 jobs:
   release:
+    # 電腦版只在 asdZzz-coder/tools 發布(手機版的倉庫 money-phone-app 跑 android-release.yml)
+    if: github.repository == 'asdZzz-coder/tools'
     # ClickOnce 需要完整版 MSBuild,且 .NET 10 需要 Visual Studio 2026
     runs-on: windows-2025-vs2026
     steps:

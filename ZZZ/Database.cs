@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System.Globalization;
+using System.IO;
 using Microsoft.Data.Sqlite;
 
 namespace ZZZ
@@ -8,9 +9,11 @@ namespace ZZZ
     /// <param name="ClosingDay">信用卡每月結帳日(1–31,月份天數不夠時為月底)</param>
     /// <param name="DueDay">信用卡每月繳款日</param>
     /// <param name="PayWalletId">繳卡費預設從哪個錢包付</param>
+    /// <param name="Style">外觀風格:空字串為一般,<see cref="Database.Cute"/> 為可愛風(目前只有手機版會用到)</param>
     public record Wallet(long Id, string Name, double Balance, string Kind = "", double Limit = 0,
-                         int ClosingDay = 0, int DueDay = 0, long? PayWalletId = null)
+                         int ClosingDay = 0, int DueDay = 0, long? PayWalletId = null, string Style = "")
     {
+        public bool IsCute => Style == Database.Cute;
         public bool IsCard => Kind == Database.CreditCard;
         public bool IsSavings => Kind == Database.Savings;
         public double Owed => Math.Max(-Balance, 0);
@@ -283,6 +286,7 @@ namespace ZZZ
         public const string Yearly = "每年"; // goals.repeat
         public const string CreditCard = "信用卡"; // wallets.kind
         public const string Savings = "存錢"; // wallets.kind:存錢用錢包,不算進流動資金
+        public const string Cute = "可愛"; // wallets.style:可愛風(空字串為一般風格)
         public const string Transfer = "轉帳", CardPayment = "繳卡費", MoveFunds = "轉移資金"; // 清單中轉帳列的類型、分類
         // 清單中欠款經過錢包那幾列的類型、分類
         public const string DebtMove = "欠款", Lend = "借出", Borrow = "借入", RepayIn = "收回還款", RepayOut = "還款";
@@ -307,6 +311,11 @@ namespace ZZZ
         }
 
         public void Dispose() => db.Dispose();
+
+        /// <summary>解析金額(不受地區設定影響,可含千分位逗號)。電腦版與手機版共用。</summary>
+        public static bool TryParseAmount(string s, out double value) =>
+            double.TryParse(s.Replace(",", "").Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
+            && !double.IsNaN(value) && !double.IsInfinity(value);
 
         SqliteCommand Cmd(string sql, params object?[] args)
         {
@@ -393,6 +402,8 @@ namespace ZZZ
                 Exec("ALTER TABLE records ADD COLUMN installment_id INTEGER");
                 Exec("ALTER TABLE records ADD COLUMN period INTEGER");
             }
+            if (!Columns("wallets").Contains("style")) // 錢包外觀風格(手機版):'' 一般、'可愛'
+                Exec("ALTER TABLE wallets ADD COLUMN style TEXT DEFAULT ''");
             if (Convert.ToInt64(Scalar("PRAGMA user_version")) < 1) ConvertLinkedGoals();
             EnsureDefaults();
         }
@@ -454,10 +465,13 @@ namespace ZZZ
             $"THEN -amount ELSE amount END) FROM debt_payments WHERE wallet_id = w.id{until}), 0)";
 
         public List<Wallet> Wallets() => Query(
-            $"SELECT w.id, w.name, {BalanceSql("")}, w.kind, w.credit_limit, w.closing_day, w.due_day, w.pay_wallet_id " +
+            $"SELECT w.id, w.name, {BalanceSql("")}, w.kind, w.credit_limit, w.closing_day, w.due_day, w.pay_wallet_id, w.style " +
             "FROM wallets w ORDER BY w.sort, w.id",
             r => new Wallet(r.GetInt64(0), Str(r, 1), Num(r, 2), Str(r, 3), Num(r, 4), (int)Num(r, 5), (int)Num(r, 6),
-                            r.IsDBNull(7) ? null : r.GetInt64(7)));
+                            r.IsDBNull(7) ? null : r.GetInt64(7), Str(r, 8)));
+
+        /// <summary>設定錢包的外觀風格(空字串為一般,<see cref="Cute"/> 為可愛風)。</summary>
+        public void SetWalletStyle(long id, string style) => Exec("UPDATE wallets SET style=@p0 WHERE id=@p1", style, id);
 
         /// <summary>信用卡目前這一期的帳單。</summary>
         public CardBill Bill(Wallet card)

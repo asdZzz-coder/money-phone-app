@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 原生元件(狀態列底色、日期選擇器、選單)的顏色,與 Theme.cs 的淺色配色一致 -->
+<resources>
+    <color name="colorPrimary">#1F2937</color>
+    <color name="colorPrimaryDark">#F4F5F7</color>
+    <color name="colorAccent">#1F2937</color>
+</resources>

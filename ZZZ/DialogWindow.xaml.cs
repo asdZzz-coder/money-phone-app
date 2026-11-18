@@ -262,8 +262,6 @@ namespace ZZZ
             return Run(d) ? chosen : null;
         }
 
-        public static bool TryParseAmount(string s, out double value) =>
-            double.TryParse(s.Replace(",", "").Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
-            && !double.IsNaN(value) && !double.IsInfinity(value);
+        public static bool TryParseAmount(string s, out double value) => Database.TryParseAmount(s, out value);
     }
 }

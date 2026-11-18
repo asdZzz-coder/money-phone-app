@@ -1,0 +1,77 @@
+# 手機版(Android):推送 v* 標籤(例如 v1.0.21)時編譯 APK,發布到 asdZzz-coder/money-phone-app 的 GitHub Release。
+#   git tag v1.0.21
+#   git push phone v1.0.21
+# APK 用同一把金鑰簽章(GitHub Secrets),新版才能直接覆蓋安裝舊版、資料保留:
+#   ANDROID_KEYSTORE_BASE64   金鑰檔 ledger-release.keystore 的 base64
+#   ANDROID_KEYSTORE_PASSWORD 金鑰檔與金鑰的密碼(別名 ledger)
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    # 電腦版在 asdZzz-coder/tools 發布,那邊不跑這個
+    if: github.repository == 'asdZzz-coder/money-phone-app'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: "17"
+
+      - name: 安裝 MAUI Android 工作負載
+        run: dotnet workload install maui-android
+
+      - name: 由標籤取得版本號
+        id: ver
+        run: |
+          v="${GITHUB_REF_NAME#v}"; v="${v#V}"
+          if ! [[ "$v" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then echo "標籤需為 vX.Y.Z 格式,收到:$GITHUB_REF_NAME"; exit 1; fi
+          # Android 的 versionCode 必須一直變大:X*10000 + Y*100 + Z
+          code=$(( ${BASH_REMATCH[1]} * 10000 + ${BASH_REMATCH[2]} * 100 + ${BASH_REMATCH[3]} ))
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: 還原簽章金鑰
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then echo "缺少 ANDROID_KEYSTORE_BASE64,請先在倉庫的 Settings → Secrets 設定簽章金鑰"; exit 1; fi
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/ledger-release.keystore"
+
+      - name: 編譯 APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          dotnet publish Mobile/Mobile.csproj -f net10.0-android -c Release -o dist/android \
+            -p:ApplicationDisplayVersion=${{ steps.ver.outputs.version }} \
+            -p:ApplicationVersion=${{ steps.ver.outputs.code }} \
+            -p:AndroidSigningKeyStore="$RUNNER_TEMP/ledger-release.keystore" \
+            -p:AndroidSigningKeyAlias=ledger \
+            -p:AndroidSigningKeyPass=env:KEYSTORE_PASSWORD \
+            -p:AndroidSigningStorePass=env:KEYSTORE_PASSWORD
+          cp dist/android/com.asdzzzcoder.ledger-Signed.apk "dist/Ledger-Android-v${{ steps.ver.outputs.version }}.apk"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: 簡易記帳 Android 版 v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ## 安裝
+            用手機下載 **Ledger-Android-v${{ steps.ver.outputs.version }}.apk**,點開安裝(第一次要允許瀏覽器「安裝不明來源的應用程式」)。
+            已安裝的手機在「更多 → 檢查更新」會直接下載新版,安裝時覆蓋舊版,記帳資料不會不見。
+
+            資料存在手機裡;解除安裝會一起刪除,記得用「更多 → 匯出資料」備份。電腦版匯出的完整備份(.json)也可以在手機匯入。
+          files: dist/Ledger-Android-v${{ steps.ver.outputs.version }}.apk

@@ -134,7 +134,7 @@ namespace ZZZ
                 var dateOk = DateTime.TryParse(Get(0), CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ||
                              DateTime.TryParse(Get(0), out date);
                 var type = Get(2);
-                var amtOk = DialogWindow.TryParseAmount(Get(4), out var amt);
+                var amtOk = Database.TryParseAmount(Get(4), out var amt);
                 if (!dateOk) rows.Errors.Add($"第 {n + 1} 行:日期「{Get(0)}」無法辨識");
                 else if (type != Database.Income && type != Database.Expense) rows.Errors.Add($"第 {n + 1} 行:類型需為「收入」或「支出」");
                 else if (!amtOk || amt == 0) rows.Errors.Add($"第 {n + 1} 行:金額「{Get(4)}」無效");
