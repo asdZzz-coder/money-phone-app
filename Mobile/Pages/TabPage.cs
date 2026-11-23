@@ -10,8 +10,9 @@ public abstract class TabPage : ContentPage
     {
         this.Page(title);
         Shell.SetNavBarIsVisible(this, false);
-        State.Changed += Refresh;
-        if (Application.Current is { } app) app.RequestedThemeChanged += (_, _) => Refresh();
+        // 換成可愛主題時整個畫面會重建,舊的頁面已不在視窗裡,就不再更新
+        State.Changed += () => { if (Window != null) Refresh(); };
+        if (Application.Current is { } app) app.RequestedThemeChanged += (_, _) => { if (Window != null) Refresh(); };
     }
 
     protected override void OnAppearing()
@@ -25,7 +26,8 @@ public abstract class TabPage : ContentPage
     /// <summary>頁面最上方的大標題與說明。</summary>
     protected static View Header(string title, string? sub = null)
     {
-        var s = new VerticalStackLayout { Spacing = 2, Children = { Ui.L(title, 24, bold: true) } };
+        // 可愛主題在標題旁加一朵小花
+        var s = new VerticalStackLayout { Spacing = 2, Children = { Ui.L(Theme.CuteMode ? $"{title} 🌸" : title, 24, bold: true) } };
         if (sub != null) s.Add(Ui.L(sub, 13, Theme.Muted));
         return s;
     }

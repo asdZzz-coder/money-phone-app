@@ -2,15 +2,19 @@ using static ZZZ.Mobile.State;
 
 namespace ZZZ.Mobile;
 
-/// <summary>更多:錢包、分類、匯出匯入、刪除全部資料、外觀(深色/淺色)、檢查更新、關於。</summary>
+/// <summary>更多:錢包、分類、匯出匯入、刪除全部資料、外觀(跟隨系統/淺色/深色/可愛)、檢查更新、關於。</summary>
 public class MorePage : TabPage
 {
     readonly Label versionText = Ui.L1("", 12, Theme.Muted);
 
     public MorePage() : base("更多")
     {
-        var themes = new[] { Theme.FollowSystem, Theme.LightMode, Theme.DarkMode };
-        var (themeSeg, _) = Ui.Segment(["跟隨系統", "淺色", "深色"], Math.Max(Array.IndexOf(themes, Theme.Load()), 0), i => Theme.Apply(themes[i]));
+        var themes = new[] { Theme.FollowSystem, Theme.LightMode, Theme.DarkMode, Theme.CuteTheme };
+        var (themeSeg, _) = Ui.Segment(["跟隨系統", "淺色", "深色", "可愛 🎀"], Math.Max(Array.IndexOf(themes, Theme.Load()), 0), i =>
+        {
+            // 換進或換出可愛主題要重建畫面(等按鈕的點擊處理完再換),重建後停在「更多」
+            if (Theme.Apply(themes[i])) Dispatcher.Dispatch(() => App.Rebuild(4));
+        });
 
         Content = new ScrollView
         {

@@ -23,7 +23,7 @@ public class WalletsPage : SubPage
                 Children = { buttons, items, Ui.L("點錢包只看它的記錄;按「⋯」編輯、調整順序或刪除。", 12, Theme.Subtle) },
             },
         };
-        State.Changed += Refresh;
+        State.Changed += () => { if (Window != null) Refresh(); }; // 關掉的頁面(或換主題前的舊畫面)不再更新
     }
 
     protected override void OnAppearing()

@@ -19,12 +19,23 @@ public class App : Application
         };
         return window;
     }
+
+    /// <summary>
+    /// 切換可愛主題後重建整個畫面:顏色是在建立元件時綁定的,換主題要重新建立才會套用。
+    /// <paramref name="tab"/> 是重建後要停在哪個分頁(0 = 記帳 … 4 = 更多)。
+    /// </summary>
+    public static void Rebuild(int tab)
+    {
+        if (Current?.Windows.FirstOrDefault() is not { } window) return;
+        window.Page = new AppShell(tab);
+        SystemBars.Update();
+    }
 }
 
 /// <summary>底部五個分頁。</summary>
 public class AppShell : Shell
 {
-    public AppShell()
+    public AppShell(int tab = 0)
     {
         this.SetAppThemeColor(BackgroundColorProperty, Theme.Bg.Light, Theme.Bg.Dark);
         this.SetAppThemeColor(ForegroundColorProperty, Theme.Text.Light, Theme.Text.Dark);
@@ -40,6 +51,7 @@ public class AppShell : Shell
         bar.Items.Add(Tab("目標", "tab_goals.png", "goals", () => new GoalsPage()));
         bar.Items.Add(Tab("圖表", "tab_stats.png", "stats", () => new StatsPage()));
         bar.Items.Add(Tab("更多", "tab_more.png", "more", () => new MorePage()));
+        bar.CurrentItem = bar.Items[tab];
         Items.Add(bar);
     }
 

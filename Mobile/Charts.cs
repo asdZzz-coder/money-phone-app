@@ -19,15 +19,23 @@ public static class ChartPalette
         "#B8A04A", "#7D8CA3", "#A0785A", "#6C8EBF", "#B39CD0",
     }.Select(Color.FromArgb).ToArray();
 
-    static readonly Color Other = Color.FromArgb("#B8BEC7");
+    /// <summary>可愛主題用的粉嫩色(同樣避開綠、紅、橘)。</summary>
+    static readonly Color[] CuteColors = new[]
+    {
+        "#F28DB2", "#A98BE0", "#7FB3E0", "#E3BE6A", "#79BFD6",
+        "#D59BD8", "#9FA8DA", "#C9A27E", "#F4B6C9", "#B9C4E8",
+    }.Select(Color.FromArgb).ToArray();
+
+    static readonly Color Other = Color.FromArgb("#B8BEC7"), CuteOther = Color.FromArgb("#D8C8CF");
 
     /// <summary>依分類在「管理分類」中的順序配色,換月份顏色也不會變;「其他」固定灰色。</summary>
     public static Color For(string category, IReadOnlyList<string> categories)
     {
-        if (category == "其他") return Other;
+        if (category == "其他") return Theme.CuteMode ? CuteOther : Other;
         int i = categories.ToList().IndexOf(category);
         if (i < 0) i = categories.Count + category.Sum(c => c); // 已刪除的分類:用名稱算出固定的顏色
-        return Colors[i % Colors.Length];
+        var colors = Theme.CuteMode ? CuteColors : Colors;
+        return colors[i % colors.Length];
     }
 }
 

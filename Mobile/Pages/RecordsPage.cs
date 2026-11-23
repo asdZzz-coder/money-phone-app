@@ -174,7 +174,7 @@ public class RecordsPage : TabPage
         foreach (var b in new[] { payBtn, installBtn })
         {
             var (bg, fg) = cute ? (new Pair(Color.FromArgb("#B3FFFFFF"), Color.FromArgb("#33FFFFFF")), Theme.CuteAccent)
-                                : (new Pair(Color.FromArgb("#33FFFFFF"), Color.FromArgb("#33FFFFFF")), Theme.OnHero);
+                                : (Theme.HeroBtn, Theme.OnHero);
             b.SetAppThemeColor(Button.BackgroundColorProperty, bg.Light, bg.Dark);
             b.SetAppThemeColor(Button.TextColorProperty, fg.Light, fg.Dark);
         }

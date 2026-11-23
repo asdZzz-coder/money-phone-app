@@ -120,7 +120,7 @@ public class DepositsPage : SubPage
     {
         this.goalId = goalId;
         Body = new ScrollView { Content = new VerticalStackLayout { Spacing = 12, Padding = new Thickness(16, 12, 16, 32), Children = { head, items } } };
-        State.Changed += Refresh;
+        State.Changed += () => { if (Window != null) Refresh(); }; // 關掉的頁面(或換主題前的舊畫面)不再更新
     }
 
     protected override void OnAppearing()

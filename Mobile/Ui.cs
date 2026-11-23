@@ -42,7 +42,7 @@ public static class Ui
     {
         var b = new Button
         {
-            Text = text, FontSize = 14, CornerRadius = 10, HeightRequest = height, Padding = new Thickness(14, 0),
+            Text = text, FontSize = 14, CornerRadius = (int)Theme.R(10), HeightRequest = height, Padding = new Thickness(14, 0),
             FontAttributes = kind is Kind.Accent or Kind.DangerSolid ? FontAttributes.Bold : FontAttributes.None,
             BorderWidth = kind == Kind.Outline ? 1 : 0,
         };
@@ -51,8 +51,8 @@ public static class Ui
             Kind.Accent => (Theme.Ink, Theme.OnInk),
             Kind.Outline => (Theme.Surface, Theme.Text),
             Kind.Danger => (Theme.ExpSoft, Theme.Exp),
-            Kind.DangerSolid => (Theme.Exp, Theme.OnHero),
-            Kind.OnHero => (new Pair(Color.FromArgb("#33FFFFFF"), Color.FromArgb("#33FFFFFF")), Theme.OnHero),
+            Kind.DangerSolid => (Theme.Exp, Theme.White),
+            Kind.OnHero => (Theme.HeroBtn, Theme.OnHero),
             _ => (Theme.Ghost, Theme.Text),
         };
         b.SetAppThemeColor(Button.BackgroundColorProperty, bg.Light, bg.Dark);
@@ -124,7 +124,7 @@ public static class Ui
         {
             int k = i;
             grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-            var b = new Button { Text = options[i], FontSize = 14, CornerRadius = 8, HeightRequest = 36, Padding = 0 };
+            var b = new Button { Text = options[i], FontSize = 14, CornerRadius = (int)Theme.R(8), HeightRequest = 36, Padding = 0 };
             b.Clicked += (_, _) => { Paint(k); changed(k); };
             buttons.Add(b);
             grid.Add(b, i);
