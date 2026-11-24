@@ -86,6 +86,9 @@ public static class Dialogs
         {
             BackgroundColor = Color.FromArgb("#73000000");
             Shell.SetPresentationMode(this, PresentationMode.ModalNotAnimated);
+            // 可愛主題:對話框的小圖示換成 emoji
+            if (Theme.CuteMode)
+                icon = icon switch { "i" => "🐰", "✓" => "🎉", "!" => "🥺", "?" => "🤔", "✎" => "✏️", _ => icon };
             var iconBox = new Border
             {
                 WidthRequest = 36, HeightRequest = 36, StrokeThickness = 0, StrokeShape = Theme.Round(10),

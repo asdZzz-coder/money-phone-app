@@ -14,8 +14,11 @@ static partial class SystemBars
         window.SetBackgroundDrawable(new Android.Graphics.Drawables.ColorDrawable(bg));
 #pragma warning disable CA1422 // Android 15 起畫面延伸到狀態列底下,這兩行只對舊版有作用
         window.SetStatusBarColor(bg);
-        window.SetNavigationBarColor(Theme.Surface.Now.ToPlatform());
+        window.SetNavigationBarColor(Theme.TabBar.Now.ToPlatform());
 #pragma warning restore CA1422
+        // 有些手機(小米、三星等)的「強制深色」會把淺色的 App 自動反轉成深色,可愛主題的粉色就看不出來。
+        // App 自己有深色模式,所以一律不讓系統強制轉換
+        if (OperatingSystem.IsAndroidVersionAtLeast(29)) window.DecorView.ForceDarkAllowed = false;
         if (WindowCompat.GetInsetsController(window, window.DecorView) is not { } bars) return;
         bars.AppearanceLightStatusBars = !dark;
         bars.AppearanceLightNavigationBars = !dark;

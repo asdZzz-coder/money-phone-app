@@ -14,8 +14,8 @@
     <ApplicationTitle>簡易記帳</ApplicationTitle>
     <ApplicationId>com.asdzzzcoder.ledger</ApplicationId>
     <!-- 版本:CI 依標籤覆寫(ApplicationVersion 是 Android 的 versionCode,必須一直變大:X*10000+Y*100+Z) -->
-    <ApplicationDisplayVersion>1.0.22</ApplicationDisplayVersion>
-    <ApplicationVersion>10022</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.23</ApplicationDisplayVersion>
+    <ApplicationVersion>10023</ApplicationVersion>
 
     <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
     <!-- 備份檔是 Dictionary/List 的 JSON,用反射序列化 -->

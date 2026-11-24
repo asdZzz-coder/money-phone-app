@@ -87,7 +87,7 @@ public class AddRecordPage : ContentPage
             var chip = new Border
             {
                 Padding = new Thickness(14, 8), Margin = new Thickness(0, 0, 8, 8), StrokeThickness = sel ? 0 : 1, StrokeShape = Theme.Round(18),
-                Content = new Label { Text = c, FontSize = 14, FontAttributes = sel ? FontAttributes.Bold : FontAttributes.None }.Fg(sel ? Theme.OnInk : Theme.Text),
+                Content = new Label { Text = Theme.CuteMode ? $"{Theme.CuteEmoji(c)} {c}" : c, FontSize = 14, FontAttributes = sel ? FontAttributes.Bold : FontAttributes.None }.Fg(sel ? Theme.OnInk : Theme.Text),
             }.Fill(sel ? Theme.Ink : Theme.Surface).Stroke_(Theme.Line);
             chip.OnTap(() => { category = c; LoadCategories(); return Task.CompletedTask; }, guard: false);
             cats.Children.Add(chip);

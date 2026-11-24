@@ -27,8 +27,14 @@ public static class Ui
         new Border { Content = content, Padding = pad, StrokeShape = Theme.Round(14), StrokeThickness = 1 }
             .Fill(Theme.Surface).Stroke_(Theme.Line);
 
-    public static Border HeroCard(View content) =>
-        new Border { Content = content, Padding = new Thickness(18, 16), StrokeShape = Theme.Round(18), StrokeThickness = 0 }.Hero();
+    /// <param name="deco">可愛主題時在右上角放裝飾(收支記錄的大卡片自己處理,傳 false)</param>
+    public static Border HeroCard(View content, bool deco = true)
+    {
+        View inner = content;
+        if (deco && Theme.CuteMode)
+            inner = new Grid { Children = { content, new Label { Text = "✨🎀", FontSize = 24, HorizontalOptions = LayoutOptions.End, VerticalOptions = LayoutOptions.Start } } };
+        return new Border { Content = inner, Padding = new Thickness(18, 16), StrokeShape = Theme.Round(18), StrokeThickness = 0 }.Hero();
+    }
 
     public static Border Pill(string text, Pair fg, Pair bg) =>
         new Border
@@ -114,7 +120,8 @@ public static class Ui
             for (int i = 0; i < buttons.Count; i++)
             {
                 var b = buttons[i];
-                var (bg, fg) = i == sel ? (Theme.Surface, Theme.Text) : (Theme.Ghost, Theme.Muted);
+                // 可愛主題:選到的那一格用粉紅底白字
+                var (bg, fg) = i == sel ? (Theme.CuteMode ? (Theme.Ink, Theme.OnInk) : (Theme.Surface, Theme.Text)) : (Theme.Ghost, Theme.Muted);
                 b.SetAppThemeColor(Button.BackgroundColorProperty, bg.Light, bg.Dark);
                 b.SetAppThemeColor(Button.TextColorProperty, fg.Light, fg.Dark);
                 b.FontAttributes = i == sel ? FontAttributes.Bold : FontAttributes.None;
@@ -156,10 +163,11 @@ public static class Ui
         return (card, value, sub);
     }
 
+    /// <summary>小節標題;可愛主題前面加愛心、用粉紅色。</summary>
     public static Label Section(string text) => new Label
     {
-        Text = text, FontSize = 13, FontAttributes = FontAttributes.Bold, Margin = new Thickness(4, 12, 0, 2),
-    }.Fg(Theme.Muted);
+        Text = Theme.CuteMode ? $"♡ {text}" : text, FontSize = 13, FontAttributes = FontAttributes.Bold, Margin = new Thickness(4, 12, 0, 2),
+    }.Fg(Theme.CuteMode ? Theme.Ink : Theme.Muted);
 
     /// <summary>頁面底色。</summary>
     public static T Page<T>(this T page, string title) where T : ContentPage

@@ -158,7 +158,7 @@ public class StatsPage : TabPage
         {
             var row = new Grid { ColumnSpacing = 10, Padding = new Thickness(0, 9), ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(new GridLength(56)) } };
             row.Add(new BoxView { Color = s.Color, WidthRequest = 12, HeightRequest = 12, CornerRadius = 3, VerticalOptions = LayoutOptions.Center }, 0);
-            row.Add(new VerticalStackLayout { Children = { Ui.L1(s.Name, 14, bold: true), Ui.L1($"{s.Count} 筆", 11, Theme.Subtle) } }, 1);
+            row.Add(new VerticalStackLayout { Children = { Ui.L1(Theme.CuteMode ? $"{Theme.CuteEmoji(s.Name)} {s.Name}" : s.Name, 14, bold: true), Ui.L1($"{s.Count} 筆", 11, Theme.Subtle) } }, 1);
             row.Add(new Label { Text = s.AmountText, FontSize = 14, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }.Fg(Theme.Text), 2);
             row.Add(new Label { Text = s.ShareText, FontSize = 12, HorizontalTextAlignment = TextAlignment.End, VerticalOptions = LayoutOptions.Center }.Fg(Theme.Muted), 3);
             var name = s.Name;

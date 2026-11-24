@@ -3,7 +3,7 @@ using static ZZZ.Mobile.State;
 namespace ZZZ.Mobile;
 
 /// <summary>清單的一列(顏色依目前深色/淺色預先算好)。</summary>
-public record RecItem(RecordRow Row, string Title, string Tag, Color TagFg, Color TagBg, string Sub, string Amount, Color AmountColor);
+public record RecItem(RecordRow Row, string Title, string Tag, Color TagFg, Color TagBg, string Sub, string Amount, Color AmountColor, string Emoji);
 
 /// <summary>收支記錄:目前選的錢包、餘額大卡片、期間切換、收入/支出/結餘、記錄清單。</summary>
 public class RecordsPage : TabPage
@@ -40,7 +40,7 @@ public class RecordsPage : TabPage
         // ---- 大卡片:餘額或信用卡本期應繳 ----
         cardButtons.Add(payBtn = Ui.Btn("繳卡費", Ui.Kind.OnHero, Ops.PayCard, 36));
         cardButtons.Add(installBtn = Ui.Btn("分期", Ui.Kind.OnHero, Ops.Installments, 36));
-        hero = Ui.HeroCard(new Grid { Children = { new VerticalStackLayout { Spacing = 2, Children = { heroLabel, balanceText, balanceSub, cardButtons } }, cuteDeco } })
+        hero = Ui.HeroCard(new Grid { Children = { new VerticalStackLayout { Spacing = 2, Children = { heroLabel, balanceText, balanceSub, cardButtons } }, cuteDeco } }, deco: false)
             .OnTap(async () => { if (bill != null) await Dialogs.Info(heroLabel.Text, bill.Tip); });
 
         // ---- 期間 ----
@@ -75,7 +75,7 @@ public class RecordsPage : TabPage
             Children = { Header("收支記錄", DateTime.Today.ToString("yyyy 年 M 月 d 日 dddd")), top, hero, period, tiles, catChip, countText },
         };
         list.Footer = new BoxView { HeightRequest = 90, Color = Colors.Transparent };
-        list.EmptyView = new Label { Text = "這段期間沒有記錄\n按右下角的「+」記一筆", HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(20, 40), FontSize = 14 }.Fg(Theme.Subtle);
+        list.EmptyView = new Label { Text = Theme.Cutely("這段期間沒有記錄\n按右下角的「+」記一筆", "🐰"),HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(20, 40), FontSize = 14 }.Fg(Theme.Subtle);
         list.ItemTemplate = new DataTemplate(Row);
 
         Content = new Grid { Children = { list, Ui.Fab(() => AddRecordPage.Open()) } };
@@ -106,6 +106,18 @@ public class RecordsPage : TabPage
         grid.Add(sub, 0, 1);
         grid.Add(amount, 1, 0);
         Grid.SetRowSpan(amount, 2);
+        if (Theme.CuteMode)
+        {
+            // 可愛主題:每筆前面放分類的小圖示
+            var emoji = new Label { FontSize = 20, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center };
+            emoji.SetBinding(Label.TextProperty, static (RecItem i) => i.Emoji);
+            var avatar = new Border { Content = emoji, WidthRequest = 42, HeightRequest = 42, StrokeThickness = 0, StrokeShape = new Microsoft.Maui.Controls.Shapes.Ellipse(), VerticalOptions = LayoutOptions.Center }
+                .Fill(Theme.Ghost);
+            grid.ColumnDefinitions.Insert(0, new(GridLength.Auto));
+            foreach (var v in grid.Children.OfType<View>()) Grid.SetColumn(v, Grid.GetColumn(v) + 1);
+            grid.Add(avatar, 0, 0);
+            Grid.SetRowSpan(avatar, 2);
+        }
         var card = new Border { Content = grid, Padding = new Thickness(14, 10), Margin = new Thickness(16, 0, 16, 8), StrokeThickness = 1, StrokeShape = Theme.Round(12) }
             .Fill(Theme.Surface).Stroke_(Theme.Line);
         card.OnTap(async () => { if (card.BindingContext is RecItem it) await ItemMenu(it.Row); });
@@ -167,8 +179,9 @@ public class RecordsPage : TabPage
         walletIcon.Text = cute ? Theme.CuteIcon(selected!) : "👛";
         if (cute) hero.CuteHero(); else hero.Hero();
         hero.StrokeShape = Theme.Round(cute ? 26 : 18);
-        cuteDeco.IsVisible = cute;
-        cuteDeco.Text = cute ? Theme.CuteIcon(selected!) : "";
+        // 可愛主題:一般錢包的大卡片也有裝飾
+        cuteDeco.IsVisible = cute || Theme.CuteMode;
+        cuteDeco.Text = cute ? Theme.CuteIcon(selected!) : Theme.CuteMode ? "✨🎀" : "";
         heroLabel.Fg(cute ? Theme.OnCuteHeroMuted : Theme.OnHeroMuted);
         balanceSub.Fg(cute ? Theme.OnCuteHeroMuted : Theme.OnHeroMuted);
         foreach (var b in new[] { payBtn, installBtn })
@@ -210,6 +223,6 @@ public class RecordsPage : TabPage
         var amountColor = r.IsTransfer ? Theme.Text : r.IsIncome ? Theme.Inc : Theme.Exp;
         var parts = new List<string> { r.Date, r.Wallet };
         if (r.NoteText != "") parts.Add(r.NoteText);
-        return new RecItem(r, r.Category, tag, fg.Now, bg.Now, string.Join(" · ", parts), r.AmountText, amountColor.Now);
+        return new RecItem(r, r.Category, tag, fg.Now, bg.Now, string.Join(" · ", parts), r.AmountText, amountColor.Now, Theme.CuteEmoji(r.Category));
     }
 }

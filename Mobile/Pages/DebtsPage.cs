@@ -97,7 +97,7 @@ public class DebtsPage : TabPage
         int late = all.Count(d => d.Late);
         owe.Sub.Text = $"{all.Count(d => !d.Done && d.IOwe)} 筆未還" + (late > 0 ? $" · {late} 筆逾期" : "");
         countText.Text = $"共 {shown.Count} 筆 · 點一筆可以記錄還款或編輯";
-        emptyText.Text = filter == 0 ? "沒有未還清的欠款\n按右下角的「+」新增" : "沒有符合的欠款紀錄";
+        emptyText.Text = Theme.Cutely(filter == 0 ? "沒有未還清的欠款\n按右下角的「+」新增" : "沒有符合的欠款紀錄", "🐻");
     }
 
     static DebtItem Item(DebtRow d)

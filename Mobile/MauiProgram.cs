@@ -24,6 +24,11 @@ public static class MauiProgram
         Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("NoUnderline", (h, _) => NoUnderline(h.PlatformView));
         Microsoft.Maui.Handlers.PickerHandler.Mapper.AppendToMapping("NoUnderline", (h, _) => NoUnderline(h.PlatformView));
         Microsoft.Maui.Handlers.DatePickerHandler.Mapper.AppendToMapping("NoUnderline", (h, _) => NoUnderline(h.PlatformView));
+        // 對話框、「記一筆」是另外的視窗,也不讓系統的「強制深色」反轉顏色(見 SystemBars)
+        Microsoft.Maui.Handlers.PageHandler.Mapper.AppendToMapping("NoForceDark", (h, _) =>
+        {
+            if (OperatingSystem.IsAndroidVersionAtLeast(29)) h.PlatformView.ForceDarkAllowed = false;
+        });
 #endif
         return builder.Build();
     }

@@ -40,10 +40,10 @@ public class AppShell : Shell
         this.SetAppThemeColor(BackgroundColorProperty, Theme.Bg.Light, Theme.Bg.Dark);
         this.SetAppThemeColor(ForegroundColorProperty, Theme.Text.Light, Theme.Text.Dark);
         this.SetAppThemeColor(TitleColorProperty, Theme.Text.Light, Theme.Text.Dark);
-        this.SetAppThemeColor(TabBarBackgroundColorProperty, Theme.Surface.Light, Theme.Surface.Dark);
+        this.SetAppThemeColor(TabBarBackgroundColorProperty, Theme.TabBar.Light, Theme.TabBar.Dark);
         this.SetAppThemeColor(TabBarForegroundColorProperty, Theme.Ink.Light, Theme.Ink.Dark);
         this.SetAppThemeColor(TabBarTitleColorProperty, Theme.Ink.Light, Theme.Ink.Dark);
-        this.SetAppThemeColor(TabBarUnselectedColorProperty, Theme.Subtle.Light, Theme.Subtle.Dark);
+        this.SetAppThemeColor(TabBarUnselectedColorProperty, Theme.TabOff.Light, Theme.TabOff.Dark);
 
         var bar = new TabBar();
         bar.Items.Add(Tab("記帳", "tab_records.png", "records", () => new RecordsPage()));

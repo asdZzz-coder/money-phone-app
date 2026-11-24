@@ -21,17 +21,17 @@ public static class Theme
         new(Color.FromArgb(light), Color.FromArgb(dark), cute == null ? null : Color.FromArgb(cute));
 
     //                                      淺色        深色        可愛
-    public static readonly Pair Bg = P("#F4F5F7", "#111317", "#FFF5F8");
+    public static readonly Pair Bg = P("#F4F5F7", "#111317", "#FFE6EF");
     public static readonly Pair Surface = P("#FFFFFF", "#1B1E24");
-    public static readonly Pair Ink = P("#1F2937", "#E5E7EB", "#D9578E");
+    public static readonly Pair Ink = P("#1F2937", "#E5E7EB", "#E0508A");
     public static readonly Pair OnInk = P("#FFFFFF", "#111317");
-    public static readonly Pair Text = P("#1F2937", "#E5E7EB", "#5B3446");
-    public static readonly Pair Muted = P("#6B7280", "#9CA3AF", "#9A6F82");
-    public static readonly Pair Subtle = P("#9CA3AF", "#6E7681", "#C9A3B4");
-    public static readonly Pair Line = P("#E5E7EB", "#2A2F37", "#F8DCE7");
-    public static readonly Pair LineStrong = P("#CDD1D7", "#3D434D", "#F0BCD0");
-    public static readonly Pair Sel = P("#EDF1F7", "#273040", "#FFE6EF");
-    public static readonly Pair Ghost = P("#EEF0F3", "#262B33", "#FCEBF2");
+    public static readonly Pair Text = P("#1F2937", "#E5E7EB", "#5B2E43");
+    public static readonly Pair Muted = P("#6B7280", "#9CA3AF", "#A0687F");
+    public static readonly Pair Subtle = P("#9CA3AF", "#6E7681", "#C48BA3");
+    public static readonly Pair Line = P("#E5E7EB", "#2A2F37", "#F6BDD2");
+    public static readonly Pair LineStrong = P("#CDD1D7", "#3D434D", "#EE9DBC");
+    public static readonly Pair Sel = P("#EDF1F7", "#273040", "#FFD3E3");
+    public static readonly Pair Ghost = P("#EEF0F3", "#262B33", "#FFD9E7");
     public static readonly Pair Inc = P("#0E9F6E", "#34C38F", "#2E9E78");
     public static readonly Pair IncSoft = P("#E6F6EF", "#14322A", "#E3F5EC");
     public static readonly Pair Exp = P("#E5484D", "#F26B70", "#E0445A");
@@ -42,11 +42,37 @@ public static class Theme
     public static readonly Pair White = P("#FFFFFF", "#FFFFFF");
     /// <summary>大卡片(HeroBrush)一般是深色,上面的字用白色系;可愛主題的大卡片是粉色漸層,字改成深莓色。</summary>
     public static readonly Pair OnHero = P("#FFFFFF", "#FFFFFF", "#5B3446");
-    public static readonly Pair OnHeroMuted = P("#B6BDC8", "#B6BDC8", "#8F6276");
+    public static readonly Pair OnHeroMuted = P("#B6BDC8", "#B6BDC8", "#7A4560");
     public static readonly Pair HeroWarn = P("#FDBA74", "#FDBA74", "#C2410C");
-    public static readonly Pair HeroExp = P("#FCA5A5", "#FCA5A5", "#C81E4A");
+    public static readonly Pair HeroExp = P("#FCA5A5", "#FCA5A5", "#B0103C");
     /// <summary>大卡片上的半透明按鈕底色。</summary>
     public static readonly Pair HeroBtn = P("#33FFFFFF", "#33FFFFFF", "#B3FFFFFF");
+
+    /// <summary>分頁列(底部):可愛主題用粉紅色,一眼就看得出換了主題。</summary>
+    public static readonly Pair TabBar = P("#FFFFFF", "#1B1E24", "#FFD3E3");
+    public static readonly Pair TabOff = P("#9CA3AF", "#6E7681", "#B0708C");
+
+    // ---------- 可愛主題的小裝飾:emoji 在每支手機都看得到,不受螢幕色彩、護眼模式影響 ----------
+    static readonly Dictionary<string, string> CategoryEmoji = new()
+    {
+        ["餐飲"] = "🍰", ["交通"] = "🚌", ["購物"] = "🛍️", ["居住"] = "🏠", ["娛樂"] = "🎮", ["醫療"] = "💊", ["其他"] = "🌟",
+        ["薪資"] = "💰", ["獎金"] = "🎁", ["投資"] = "📈",
+        ["轉移資金"] = "💕", ["繳卡費"] = "💳", ["借出"] = "🤝", ["借入"] = "🤝", ["收回還款"] = "💌", ["還款"] = "💌",
+    };
+    static readonly string[] MoreEmoji = ["🌷", "🍓", "🧁", "🐱", "🦄", "🍭", "🌈", "🐥", "🍩", "🎀"];
+
+    /// <summary>分類的小圖示;自己新增的分類依名稱固定挑一個。</summary>
+    public static string CuteEmoji(string category) =>
+        CategoryEmoji.TryGetValue(category, out var e) ? e : MoreEmoji[category.Sum(c => c) % MoreEmoji.Length];
+
+    /// <summary>每個分頁右上角的小動物。</summary>
+    public static string Mascot(string title) => title switch
+    {
+        "收支記錄" => "🐰", "欠款紀錄" => "🐻", "存錢目標" => "🐷", "支出圖表" => "🦄", "更多" => "🐱", _ => "🎀",
+    };
+
+    /// <summary>可愛主題時在文字前面加一個 emoji(空清單的提示等)。</summary>
+    public static string Cutely(string text, string emoji) => CuteMode ? $"{emoji}\n{text}" : text;
 
     // ---------- 錢包的可愛風(粉嫩色系);一般風格用上面的墨色與灰階 ----------
     public static readonly Pair CuteSoft = P("#FFF0F5", "#33222B", "#FFEAF2");
@@ -61,7 +87,7 @@ public static class Theme
     static readonly Brush HeroLight = Gradient("#2B3545", "#111827"), HeroDark = Gradient("#2E3746", "#1E2430");
     static readonly Brush CuteHeroLight = Gradient("#FFB3CC", "#FFD8B8"), CuteHeroDark = Gradient("#6E3550", "#6B4636");
     /// <summary>可愛主題的大卡片:粉紅到淡紫。</summary>
-    static readonly Brush HeroCute = Gradient("#FFC2D9", "#E3D3FF");
+    static readonly Brush HeroCute = Gradient("#FF9EC4", "#C9A8FF");
 
     /// <summary>可愛風錢包的圖示:一般錢包小兔、存錢用小豬、信用卡蝴蝶結。</summary>
     public static string CuteIcon(Wallet w) => w.IsCard ? "🎀" : w.IsSavings ? "🐷" : "🐰";

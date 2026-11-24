@@ -47,7 +47,7 @@ public class GoalsPage : TabPage
                       : n == goals.Count && n > 0 ? "全部達成,太棒了!" : "繼續加油";
         cards.Children.Clear();
         if (goals.Count == 0)
-            cards.Add(new Label { Text = "還沒有存錢目標\n按右下角的「+」建立第一個", HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(20, 30), FontSize = 14 }.Fg(Theme.Subtle));
+            cards.Add(new Label { Text = Theme.Cutely("還沒有存錢目標\n按右下角的「+」建立第一個", "🐷"), HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(20, 30), FontSize = 14 }.Fg(Theme.Subtle));
         foreach (var g in goals) cards.Add(Card(g));
     }
 
@@ -137,7 +137,7 @@ public class DepositsPage : SubPage
         Title = g.Name;
         head.Text = (g.Linked ? $"存在「{g.WalletName}」 · " : "") + $"已存 {Money(g.Saved)} / {Money(g.Target)} · {g.Count} 筆";
         var list = Db.Deposits(g.Id);
-        if (list.Count == 0) items.Add(Ui.L("還沒有存取紀錄\n回到目標按「存入」開始存錢吧", 14, Theme.Subtle));
+        if (list.Count == 0) items.Add(Ui.L(Theme.Cutely("還沒有存取紀錄\n回到目標按「存入」開始存錢吧", "🐷"), 14, Theme.Subtle));
         foreach (var d in list)
         {
             var grid = new Grid { ColumnSpacing = 10, ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
